@@ -1,6 +1,7 @@
 import { useState, useContext } from "react";
 import { AuthContext } from "../AuthContext";
 import { useNavigate, Link } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function Sign_up() {
   const { signup } = useContext(AuthContext);
@@ -15,17 +16,14 @@ export default function Sign_up() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
-    // Clear field-specific errors when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
-    if (errors.submit) {
-      setErrors((prev) => ({ ...prev, submit: "" }));
-    }
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+    if (errors.submit) setErrors((prev) => ({ ...prev, submit: "" }));
   };
 
   const validateForm = () => {
@@ -51,22 +49,24 @@ export default function Sign_up() {
       setErrors(newErrors);
       return;
     }
+
     setLoading(true);
     setErrors({});
     setSuccessMessage("");
 
     try {
       await signup(form.username.trim(), form.email.trim(), form.password.trim());
-      setSuccessMessage("Account created successfully! Redirecting...");
+
+      setSuccessMessage("Account created successfully! Check your email for a welcome message.");
       setForm({ username: "", email: "", password: "", confirmPassword: "" });
-      setTimeout(() => navigate("/profile"), 1500);
+
+      setTimeout(() => navigate("/profile"), 2500);
     } catch (err) {
-      // Handle specific backend error messages
-      if (err.message.includes("Username already exists")) {
+      if (err.message.includes("Username already")) {
         setErrors({ username: "Username already exists" });
-      } else if (err.message.includes("Email already registered")) {
+      } else if (err.message.includes("Email already")) {
         setErrors({ email: "Email already registered" });
-      } else if (err.message.includes("All fields are required")) {
+      } else if (err.message.includes("required")) {
         setErrors({ submit: "All fields are required" });
       } else {
         setErrors({ submit: err.message || "Signup failed. Try again." });
@@ -78,7 +78,14 @@ export default function Sign_up() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
-      <div className="hidden lg:flex w-1/2 bg-gray-100">
+      {loading && (
+        <div className="fixed top-0 left-0 w-full h-1 bg-red-700 z-50">
+          <div className="h-full bg-red-800 animate-pulse"></div>
+        </div>
+      )}
+
+      {/* Image Section - Now visible on all screens */}
+      <div className="w-full lg:w-1/2 bg-gray-100 h-64 lg:h-auto">
         <img
           src="https://media.istockphoto.com/id/148314935/photo/university-students-studying-in-a-circle.jpg?s=2048x2048&w=is&k=20&c=ns2x6h6XIUZ_VeEJLe8jp7C9HSgnWSqU-JRJlLmm_pk="
           alt="Study"
@@ -91,12 +98,12 @@ export default function Sign_up() {
           <h2 className="text-2xl font-bold mb-6 text-center text-red-700">Sign Up</h2>
 
           {successMessage && (
-            <div className="mb-4 text-green-600 text-center font-medium">
+            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-lg text-center dark:bg-green-900 dark:text-green-200">
               {successMessage}
             </div>
           )}
           {errors.submit && (
-            <div className="mb-4 text-red-600 text-center font-medium">
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-center dark:bg-red-900 dark:text-red-200">
               {errors.submit}
             </div>
           )}
@@ -104,73 +111,89 @@ export default function Sign_up() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Username */}
             <div>
-              <label className="block font-medium text-black dark:text-white">Username</label>
+              <label className="block font-medium mb-2 text-black dark:text-white">Username</label>
               <input
                 type="text"
                 name="username"
                 value={form.username}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 text-black dark:text-white"
+                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:text-white dark:border-gray-700"
               />
-              {errors.username && <p className="text-red-600 text-sm">{errors.username}</p>}
+              {errors.username && <p className="text-red-600 text-sm mt-1 dark:text-red-400">{errors.username}</p>}
             </div>
 
             {/* Email */}
             <div>
-              <label className="block font-medium text-black dark:text-white">Email</label>
+              <label className="block font-medium mb-2 text-black dark:text-white">Email</label>
               <input
                 type="email"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 text-black dark:text-white"
+                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:text-white dark:border-gray-700"
               />
-              {errors.email && <p className="text-red-600 text-sm">{errors.email}</p>}
+              {errors.email && <p className="text-red-600 text-sm mt-1 dark:text-red-400">{errors.email}</p>}
             </div>
 
             {/* Password */}
             <div>
-              <label className="block font-medium text-black dark:text-white">Password</label>
-              <input
-                type="password"
-                name="password"
-                value={form.password}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 text-black dark:text-white"
-              />
-              {errors.password && <p className="text-red-600 text-sm">{errors.password}</p>}
+              <label className="block font-medium mb-2 text-black dark:text-white">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border rounded-lg pr-12 dark:bg-gray-800 dark:text-white dark:border-gray-700"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-white"
+                >
+                  {showPassword ? <EyeOff /> : <Eye />}
+                </button>
+              </div>
+              {errors.password && <p className="text-red-600 text-sm mt-1 dark:text-red-400">{errors.password}</p>}
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label className="block font-medium text-black dark:text-white">Confirm Password</label>
-              <input
-                type="password"
-                name="confirmPassword"
-                value={form.confirmPassword}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-600 text-black dark:text-white"
-              />
+              <label className="block font-medium mb-2 text-black dark:text-white">Confirm Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  name="confirmPassword"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border rounded-lg pr-12 dark:bg-gray-800 dark:text-white dark:border-gray-700"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-white"
+                >
+                  {showConfirmPassword ? <EyeOff /> : <Eye />}
+                </button>
+              </div>
               {errors.confirmPassword && (
-                <p className="text-red-600 text-sm">{errors.confirmPassword}</p>
+                <p className="text-red-600 text-sm mt-1 dark:text-red-400">{errors.confirmPassword}</p>
               )}
             </div>
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-2 rounded-lg transition text-white ${
-                loading ? "bg-gray-400 cursor-not-allowed" : "bg-red-700 hover:bg-red-800"
+              className={`w-full py-2 rounded-lg text-white ${
+                loading ? "bg-gray-400" : "bg-red-700 hover:bg-red-800"
               }`}
             >
               {loading ? "Creating Account..." : "Create Account"}
             </button>
 
-            {/* Already have account */}
-            <p className="mt-2 text-sm text-center text-gray-600 dark:text-gray-300">
+            <p className="mt-2 text-sm text-center text-black dark:text-white">
               Already have an account?{" "}
-              <Link to="/login" className="text-red-700 hover:underline">
+              <Link to="/login" className="text-red-700 hover:underline dark:text-red-700">
                 Login here
               </Link>
             </p>

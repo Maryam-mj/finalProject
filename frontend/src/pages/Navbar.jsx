@@ -60,7 +60,7 @@ const Navbar = () => {
               <ul className="absolute top-full left-0 mt-2  rounded-lg overflow-hidden min-w-[140px] z-50">
                 <li>
                   <Link
-                    to="/login"
+                    to="/adminlogin"
                     className="block px-4 py-2 text-white hover:bg-red-700 hover:text-black transition-colors duration-200"
                   >
                     Admin

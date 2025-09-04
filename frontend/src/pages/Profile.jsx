@@ -36,7 +36,9 @@ export default function Profile() {
         if (data && data.profile) {
           setProfile({
             bio: data.profile.bio || "",
-            interests: data.profile.interests.join(", ") || "",
+            interests: Array.isArray(data.profile.interests) 
+              ? data.profile.interests.join(", ") 
+              : data.profile.interests || "",
             specialization: data.profile.specialization || "",
             schedule: data.profile.schedule || "",
             level: data.profile.level || "Beginner",
@@ -96,14 +98,14 @@ export default function Profile() {
         if (data.profile && (
             data.profile.bio || 
             data.profile.specialization || 
-            data.profile.interests.length > 0
+            (data.profile.interests && data.profile.interests.length > 0)
         )) {
           method = "PUT";
         }
       }
 
-      // Send the request
-      const response = await fetch("http://127.0.0.1:5000/api/profile", {
+      // Send the request with proper headers for FormData
+      const response = await fetch(`http://127.0.0.1:5000/api/profile`, {
         method: method,
         credentials: "include",
         body: formData,
@@ -123,8 +125,13 @@ export default function Profile() {
           navigate("/dashboard");
         }, 1000);
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || "Failed to save profile");
+        const errorText = await response.text();
+        try {
+          const errorData = JSON.parse(errorText);
+          setError(errorData.error || "Failed to save profile");
+        } catch {
+          setError("Failed to save profile. Please try again.");
+        }
       }
     } catch (err) {
       console.error(err);

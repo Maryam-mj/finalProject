@@ -1,0 +1,17 @@
+Welcome to StudyBuddy, {{ username }}!
+
+Congratulations on creating your account! We're excited to have you join our community of learners.
+
+With StudyBuddy, you can:
+- Connect with other students
+- Join study groups
+- Track your learning progress
+- Participate in challenges
+- Chat with study buddies in real-time
+- Get notifications about new messages and activities
+
+Start exploring by completing your profile and connecting with other students.
+
+Happy studying!
+
+The StudyBuddy Team

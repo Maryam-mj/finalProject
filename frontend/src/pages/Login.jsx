@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { getInitialsAvatar, api } from "../pages/utils/api";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -10,43 +11,43 @@ export default function Login() {
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-      // First make the login request
-      const res = await fetch("http://127.0.0.1:5000/api/auth/login", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          email: form.email,
-          password: form.password,
-        }),
-      });
+  try {
+    const res = await fetch("http://127.0.0.1:5000/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include", // keep session cookies
+      body: JSON.stringify({
+        email: form.email.trim(),
+        password: form.password.trim(),
+      }),
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Login failed");
-      }
-
-      // Store user data in localStorage
-      localStorage.setItem("user", JSON.stringify(data.user));
-      
-      // Redirect to dashboard
-      navigate("/dashboard");
-    } catch (err) {
-      setError(err.message || "Login failed. Please try again.");
-      console.error("Login error:", err);
-    } finally {
-      setLoading(false);
+    if (!res.ok) {
+      throw new Error(data.error || "Login failed");
     }
-  };
+
+    // Store only the user object
+    localStorage.setItem("user", JSON.stringify(data.user));
+
+    console.log("Login successful, user data:", data.user);
+
+    // Redirect to dashboard
+    navigate("/dashboard");
+  } catch (err) {
+    setError(err.message || "Login failed. Please try again.");
+    console.error("Login error:", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-white dark:bg-black">

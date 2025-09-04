@@ -24,13 +24,9 @@ dummy_activities = [
     }
 ]
 
-@activities_bp.route("/api/activities", methods=["GET"])
+@activities_bp.route("/", methods=["GET"])
 @login_required
 def get_activities():
-    """
-    Returns a list of recent activities for the logged-in user.
-    Later, replace dummy_activities with real database query filtering by current_user.id.
-    """
     activities = []
     for act in dummy_activities:
         activities.append({

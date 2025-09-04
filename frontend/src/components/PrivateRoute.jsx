@@ -1,16 +1,19 @@
-import React, { useContext } from "react";
+import React from "react";
 import { Navigate } from "react-router-dom";
-import { AuthContext } from "../AuthContext";
+import { useAuth } from "../AuthContext";
 
 const PrivateRoute = ({ children }) => {
-  const { user } = useContext(AuthContext);
+  const { user, authChecked } = useAuth();
+
+  // Wait until auth status is checked before deciding
+  if (!authChecked) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
 
   if (!user) {
-    // Not logged in, redirect to login page
     return <Navigate to="/login" replace />;
   }
 
-  // Logged in, render children
   return children;
 };
 

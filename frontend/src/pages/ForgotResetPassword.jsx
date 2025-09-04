@@ -81,7 +81,10 @@ export default function ForgotResetPassword() {
       const res = await fetch("http://127.0.0.1:5000/api/auth/verify-reset-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: code.trim() }),
+        body: JSON.stringify({ 
+          email: email, 
+          code: code.trim() // This should work as the backend accepts both "code" and "resetCode"
+        }),
         credentials: "include",
       });
       const data = await res.json();
@@ -138,7 +141,11 @@ export default function ForgotResetPassword() {
       const res = await fetch("http://127.0.0.1:5000/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code, newPassword }),
+        body: JSON.stringify({ 
+          email: email, 
+          code: code, // ✅ Send the code again for verification
+          newPassword: newPassword 
+        }),
         credentials: "include",
       });
 
@@ -149,7 +156,7 @@ export default function ForgotResetPassword() {
       } else {
         setMessage("✅ Password reset successfully! Redirecting...");
         setTimeout(() => {
-          navigate("/dashboard"); // ✅ Redirect to dashboard
+          navigate("/login"); // Redirect to login instead of dashboard
         }, 1000);
       }
     } catch {

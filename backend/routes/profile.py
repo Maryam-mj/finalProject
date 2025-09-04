@@ -5,7 +5,8 @@ import os
 from werkzeug.utils import secure_filename
 from flask_cors import cross_origin
 
-profile_bp = Blueprint("profile", __name__, url_prefix="/api/profile")
+# Create blueprint without url_prefix - will be prefixed in app.py
+profile_bp = Blueprint("profile", __name__)
 
 UPLOAD_FOLDER = "uploads/profile_pics"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -17,7 +18,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@profile_bp.route("", methods=["GET"])
+@profile_bp.route("/profile", methods=["GET"])
 @login_required
 @cross_origin(supports_credentials=True)
 def get_profile():
@@ -68,22 +69,24 @@ def get_profile():
         print("🔥 Get profile error:", str(e))
         return jsonify({"error": "Failed to fetch profile"}), 500
 
-# Update profile
-@profile_bp.route("", methods=["PUT"])
+@profile_bp.route("/profile", methods=["PUT"])
 @login_required
 @cross_origin(supports_credentials=True)
 def update_profile():
     try:
         profile = Profile.query.filter_by(user_id=current_user.id).first()
         
-        # If profile doesn't exist, create one instead of returning 404
+        # If profile doesn't exist, create one
         if not profile:
-            return create_profile()  # Reuse the create function
+            return create_profile()
 
-        # Rest of your existing update code...
-        # Handle both form data and JSON
+        data = {}
+        profile_picture_path = None
+
+        # Handle multipart/form-data (file upload)
         if request.content_type and request.content_type.startswith('multipart/form-data'):
-            data = request.form
+            data = request.form.to_dict()
+            
             # Handle file upload
             if "profilePic" in request.files:
                 file = request.files["profilePic"]
@@ -93,17 +96,36 @@ def update_profile():
                     filename = f"{current_user.id}_{name}{ext}"
                     filepath = os.path.join(UPLOAD_FOLDER, filename)
                     file.save(filepath)
-                    profile.profile_picture = f"/uploads/profile_pics/{filename}"
-        else:
-            data = request.get_json()
+                    profile_picture_path = f"/uploads/profile_pics/{filename}"
         
-        # Update profile fields
-        if data:
-            profile.bio = data.get("bio", profile.bio)
-            profile.interests = data.get("interests", profile.interests)
-            profile.specialization = data.get("specialization", profile.specialization)
-            profile.level = data.get("level", profile.level)
-            profile.schedule = data.get("schedule", profile.schedule)
+        # Handle application/json
+        elif request.content_type and request.content_type.startswith('application/json'):
+            data = request.get_json()
+        else:
+            return jsonify({"error": "Unsupported media type. Use multipart/form-data for file uploads or application/json for data only."}), 415
+
+        # Update profile fields from data
+        if 'bio' in data:
+            profile.bio = data.get('bio')
+            
+        if 'interests' in data:
+            interests = data.get('interests', '')
+            if isinstance(interests, list):
+                interests = ", ".join(interests)
+            profile.interests = interests
+            
+        if 'specialization' in data:
+            profile.specialization = data.get('specialization')
+            
+        if 'level' in data:
+            profile.level = data.get('level')
+            
+        if 'schedule' in data:
+            profile.schedule = data.get('schedule')
+            
+        # Update profile picture if a new one was uploaded
+        if profile_picture_path:
+            profile.profile_picture = profile_picture_path
 
         db.session.commit()
         
@@ -111,19 +133,37 @@ def update_profile():
 
     except Exception as e:
         db.session.rollback()
+        print("🔥 Update profile error:", str(e))
         return jsonify({"error": f"Failed to update profile: {str(e)}"}), 500
 
-# Create profile (POST /api/profile)
-@profile_bp.route("", methods=["POST"])
+@profile_bp.route("/profile", methods=["POST"])
 @login_required
 @cross_origin(supports_credentials=True)
 def create_profile():
     try:
-        # Check if content type is multipart/form-data for file upload
+        data = {}
+        profile_picture_path = None
+
+        # Handle multipart/form-data (file upload)
         if request.content_type and request.content_type.startswith('multipart/form-data'):
-            data = request.form
-        else:
+            data = request.form.to_dict()
+            
+            # Handle file upload
+            if "profilePic" in request.files:
+                file = request.files["profilePic"]
+                if file and file.filename != '' and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    name, ext = os.path.splitext(filename)
+                    filename = f"{current_user.id}_{name}{ext}"
+                    filepath = os.path.join(UPLOAD_FOLDER, filename)
+                    file.save(filepath)
+                    profile_picture_path = f"/uploads/profile_pics/{filename}"
+        
+        # Handle application/json
+        elif request.content_type and request.content_type.startswith('application/json'):
             data = request.get_json()
+        else:
+            return jsonify({"error": "Unsupported media type. Use multipart/form-data for file uploads or application/json for data only."}), 415
             
         if not data:
             return jsonify({"error": "No input data provided"}), 400
@@ -133,29 +173,18 @@ def create_profile():
         if existing_profile:
             return jsonify({"error": "Profile already exists"}), 400
 
-        # Handle file upload if present
-        profile_picture_path = None
-        if "profilePic" in request.files:
-            file = request.files["profilePic"]
-            if file and file.filename != '' and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                # Add user ID to filename to make it unique
-                name, ext = os.path.splitext(filename)
-                filename = f"{current_user.id}_{name}{ext}"
-                
-                filepath = os.path.join(UPLOAD_FOLDER, filename)
-                file.save(filepath)
-                
-                # Store the relative path
-                profile_picture_path = f"/uploads/profile_pics/{filename}"
+        # Handle interests - convert list to comma-separated string if needed
+        interests = data.get("interests", "")
+        if isinstance(interests, list):
+            interests = ", ".join(interests)
 
         new_profile = Profile(
             user_id=current_user.id,
-            bio=data.get("bio"),
-            interests=data.get("interests"),
-            specialization=data.get("specialization"),
+            bio=data.get("bio", ""),
+            interests=interests,
+            specialization=data.get("specialization", ""),
             level=data.get("level", "Beginner"),
-            schedule=data.get("schedule"),
+            schedule=data.get("schedule", ""),
             profile_picture=profile_picture_path,
         )
 
@@ -165,4 +194,5 @@ def create_profile():
         return jsonify({"message": "Profile created successfully"}), 201
     except Exception as e:
         db.session.rollback()
+        print("🔥 Create profile error:", str(e))
         return jsonify({"error": f"Failed to create profile: {str(e)}"}), 500

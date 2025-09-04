@@ -10,8 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@chakra-ui/react": "^3.26.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^7.3.2",
     "@tailwindcss/vite": "^4.1.11",
+    "antd": "^5.27.2",
     "axios": "^1.11.0",
+    "framer-motion": "^12.23.12",
     "lodash": "^4.17.21",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.536.0",
