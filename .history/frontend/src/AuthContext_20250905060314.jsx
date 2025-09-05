@@ -1,4 +1,3 @@
-// File: src/AuthContext.jsx
 import React, { createContext, useState, useEffect, useContext } from "react";
 
 export const AuthContext = createContext();
@@ -10,30 +9,25 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
-  /**
-   * Authenticated fetch:
-   * - Always includes cookies (credentials: "include")
-   * - Adds Authorization: Bearer <token> if we have one
-   * - Parses JSON safely even on errors (server might send HTML in some misconfigs)
-   */
+  // Authenticated fetch: sends cookies and Bearer token (if present)
   const fetchWithAuth = async (url, options = {}) => {
     const token = localStorage.getItem("token");
-    const res = await fetch(url, {
-      mode: "cors",
+    const defaultOptions = {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {}),
+        ...options.headers,
       },
-      ...options,
-    });
+    };
+
+    const res = await fetch(url, { ...defaultOptions, ...options });
 
     let data = {};
     try {
       data = await res.clone().json();
-    } catch {
-      // Non-JSON response (e.g., HTML) — leave as {}
+    } catch (_) {
+      // non-JSON (e.g., HTML) — leave data as {}
     }
 
     if (!res.ok) {
@@ -43,45 +37,36 @@ export function AuthProvider({ children }) {
         data?.message ||
         res.statusText ||
         "Request failed";
-      const err = new Error(message);
-      // @ts-ignore (handy for callers)
-      err.status = res.status;
-      throw err;
+      throw new Error(message);
     }
 
-    // Return parsed JSON (or {} if no body)
     return data;
   };
 
-  /**
-   * Bootstrap auth on first mount.
-   * If there’s no sign of a session (no cached user, no admin flag, no token),
-   * skip calling /me to avoid needless 401s.
-   */
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         const storedUser = localStorage.getItem("authUser");
-        const adminAuthenticated = localStorage.getItem("adminAuthenticated") === "true";
+        const adminAuthenticated = localStorage.getItem("adminAuthenticated");
         const hasToken = !!localStorage.getItem("token");
 
         if (storedUser) {
           setUser(JSON.parse(storedUser));
         }
 
-        // No sign of session? Don’t ping /me.
-        if (!storedUser && !adminAuthenticated && !hasToken) {
+        // If we have no sign of a session, don't ping /me (prevents loops)
+        if (!storedUser && adminAuthenticated !== "true" && !hasToken) {
           setLoading(false);
           setAuthChecked(true);
           return;
         }
 
-        if (adminAuthenticated) {
+        if (adminAuthenticated === "true") {
           // Verify admin session
-          const me = await fetchWithAuth(`${API_URL}/api/admin/me`);
-          if (me && (me.is_admin === true || me.role === "admin")) {
-            setUser(me);
-            localStorage.setItem("authUser", JSON.stringify(me));
+          const adminData = await fetchWithAuth(`${API_URL}/api/admin/me`);
+          if (adminData && (adminData.is_admin === true || adminData.role === "admin")) {
+            setUser(adminData);
+            localStorage.setItem("authUser", JSON.stringify(adminData));
           } else {
             setUser(null);
             localStorage.removeItem("authUser");
@@ -90,9 +75,9 @@ export function AuthProvider({ children }) {
           }
         } else {
           // Verify regular session
-          const me = await fetchWithAuth(`${API_URL}/api/auth/me`);
-          setUser(me);
-          localStorage.setItem("authUser", JSON.stringify(me));
+          const data = await fetchWithAuth(`${API_URL}/api/auth/me`);
+          setUser(data);
+          localStorage.setItem("authUser", JSON.stringify(data));
         }
       } catch (e) {
         console.error("Auth check failed:", e);
@@ -109,29 +94,21 @@ export function AuthProvider({ children }) {
     initializeAuth();
   }, []);
 
-  /**
-   * Regular login
-   * Stores any token and then fetches /api/auth/me to hydrate the user state.
-   */
+  // Regular user login
   const login = async (email, password) => {
     try {
-      const data = await fetchWithAuth(`${API_URL}/api/auth/login`, {
+      const loginData = await fetchWithAuth(`${API_URL}/api/auth/login`, {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
 
-      // Store token if provided
-      const t =
-        data?.access_token ||
-        data?.token ||
-        data?.access ||
-        data?.data?.access_token ||
-        data?.data?.token;
+      // Store token if backend returns one
+      const t = loginData?.access_token || loginData?.token;
       if (t) localStorage.setItem("token", t);
 
-      const me = await fetchWithAuth(`${API_URL}/api/auth/me`);
-      setUser(me);
-      localStorage.setItem("authUser", JSON.stringify(me));
+      const userData = await fetchWithAuth(`${API_URL}/api/auth/me`);
+      setUser(userData);
+      localStorage.setItem("authUser", JSON.stringify(userData));
       localStorage.removeItem("adminAuthenticated");
       return true;
     } catch (e) {
@@ -139,46 +116,40 @@ export function AuthProvider({ children }) {
     }
   };
 
-  /**
-   * Admin login
-   * Saves token when provided, verifies with /api/admin/me, and persists user.
-   */
+  // Admin login
   const adminLogin = async (email, password) => {
     try {
-      const data = await fetchWithAuth(`${API_URL}/api/admin/login`, {
+      const loginData = await fetchWithAuth(`${API_URL}/api/admin/login`, {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
 
-      // Save token if provided (JWT flows)
-      const t =
-        data?.access_token ||
-        data?.token ||
-        data?.access ||
-        data?.data?.access_token ||
-        data?.data?.token;
+      // Save token when provided (supports JWT-based admin APIs)
+      const t = loginData?.access_token || loginData?.token;
       if (t) localStorage.setItem("token", t);
 
-      // Some backends return {user: {...}}, others return the user directly
-      const rawUser = data.user || data;
+      // Some backends return { user: {...} }, others return the user directly
+      const adminUser = loginData.user || loginData;
 
-      // Client-side admin assertion supports both is_admin bool and role string
-      if (!rawUser || !(rawUser.is_admin === true || rawUser.role === "admin")) {
+      // Double-check admin flag (support is_admin boolean or role string)
+      if (!adminUser || !(adminUser.is_admin === true || adminUser.role === "admin")) {
         throw new Error("Not authorized as admin");
       }
 
+      // Persist admin session
+      setUser(adminUser);
+      localStorage.setItem("authUser", JSON.stringify(adminUser));
       localStorage.setItem("adminAuthenticated", "true");
 
-      // Verify with backend to ensure credentials are actually accepted by API
+      // Optional: immediately verify with /api/admin/me (ensures cookie/JWT is valid)
       try {
         const verified = await fetchWithAuth(`${API_URL}/api/admin/me`);
-        const finalUser = verified?.id ? verified : rawUser;
-        setUser(finalUser);
-        localStorage.setItem("authUser", JSON.stringify(finalUser));
-      } catch {
-        // If verify fails here, protected pages will surface it later
-        setUser(rawUser);
-        localStorage.setItem("authUser", JSON.stringify(rawUser));
+        if (verified && (verified.is_admin === true || verified.role === "admin")) {
+          setUser(verified);
+          localStorage.setItem("authUser", JSON.stringify(verified));
+        }
+      } catch (_) {
+        // If verification fails here, the dashboard fetch will surface it
       }
 
       return true;
@@ -187,6 +158,7 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Admin logout
   const adminLogout = async () => {
     try {
       await fetchWithAuth(`${API_URL}/api/admin/logout`, { method: "POST" });
@@ -203,14 +175,14 @@ export function AuthProvider({ children }) {
   const checkAdminSession = async () => {
     try {
       return await fetchWithAuth(`${API_URL}/api/admin/me`);
-    } catch {
+    } catch (_) {
       throw new Error("Admin session check failed");
     }
   };
 
   const isAdmin = () => {
-    const flag = localStorage.getItem("adminAuthenticated") === "true";
-    return flag && user && (user.is_admin === true || user.role === "admin");
+    const adminAuthenticated = localStorage.getItem("adminAuthenticated");
+    return user && (user.is_admin === true || user.role === "admin") && adminAuthenticated === "true";
   };
 
   const signup = async (username, email, password) => {
@@ -220,12 +192,7 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ username, email, password }),
       });
 
-      const t =
-        data?.access_token ||
-        data?.token ||
-        data?.access ||
-        data?.data?.access_token ||
-        data?.data?.token;
+      const t = data?.access_token || data?.token;
       if (t) localStorage.setItem("token", t);
 
       const newUser = data.user || data;
@@ -254,20 +221,22 @@ export function AuthProvider({ children }) {
   const updateProfile = async (updateData) => {
     try {
       const isFormData = updateData instanceof FormData;
-      const res = await fetchWithAuth(`${API_URL}/api/profile`, {
+      const options = {
         method: "PUT",
         headers: isFormData ? {} : { "Content-Type": "application/json" },
         body: isFormData ? updateData : JSON.stringify(updateData),
-      });
+      };
 
-      const nextUser = res.user || res;
+      const responseData = await fetchWithAuth(`${API_URL}/api/profile`, options);
+      const nextUser = responseData.user || responseData;
+
       if (nextUser && (nextUser.id || nextUser.email || nextUser.name)) {
         setUser(nextUser);
         localStorage.setItem("authUser", JSON.stringify(nextUser));
       } else {
-        const me = await fetchWithAuth(`${API_URL}/api/auth/me`);
-        setUser(me);
-        localStorage.setItem("authUser", JSON.stringify(me));
+        const userData = await fetchWithAuth(`${API_URL}/api/auth/me`);
+        setUser(userData);
+        localStorage.setItem("authUser", JSON.stringify(userData));
       }
 
       return true;
@@ -291,8 +260,8 @@ export function AuthProvider({ children }) {
         adminLogout,
         checkAdminSession,
         isAdmin,
-        fetchWithAuth,
-        API_URL,
+        fetchWithAuth, // expose for pages (e.g., AdminDashboard -> /api/admin/stats)
+        API_URL
       }}
     >
       {children}

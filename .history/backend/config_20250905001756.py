@@ -15,8 +15,8 @@ class Config:
     SESSION_COOKIE_NAME = "studybuddy"  # <-- FIXED to match frontend/browser
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_PATH = "/"
-    SESSION_COOKIE_SAMESITE = "Lax"  # Use Lax for local dev so Chrome accepts cookie
-    SESSION_COOKIE_SECURE = False      # False for HTTP (local dev)
+    SESSION_COOKIE_SAMESITE = "None"  # Allow cross-origin cookies
+    SESSION_COOKIE_SECURE = False      # Set to True if using HTTPS
     PERMANENT_SESSION_LIFETIME = int(
         os.getenv("SESSION_LIFETIME_DAYS", 7)) * 86400
     SESSION_REFRESH_EACH_REQUEST = True

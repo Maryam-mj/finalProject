@@ -1,49 +1,50 @@
-// File: src/pages/AdminLogin.jsx
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../AuthContext"; // keep your path
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
 
 const AdminLogin = () => {
-  const [credentials, setCredentials] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
+  const [credentials, setCredentials] = useState({
+    email: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  // get adminLogin from your AuthContext
   const { adminLogin } = useAuth();
 
+  // Clear previous admin session on mount
+  useEffect(() => {
+    localStorage.removeItem('adminAuthenticated');
+    localStorage.removeItem('adminUser');
+  }, []);
+
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setCredentials((s) => ({ ...s, [name]: value }));
+    setCredentials({
+      ...credentials,
+      [e.target.name]: e.target.value
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
+    setError('');
 
     try {
-      // 1) call context login (should set cookie/JWT + authUser in localStorage)
-      await adminLogin(credentials.email, credentials.password);
+      // Call adminLogin and get the user object
+      const result = await adminLogin(credentials.email, credentials.password);
 
-      // 2) assert admin locally (covers backends that send role instead of is_admin)
-      const stored = localStorage.getItem("authUser");
-      const u = stored ? JSON.parse(stored) : null;
-      const isAdmin = u && (u.is_admin === true || u.role === "admin");
-
-      if (!isAdmin) {
-        throw new Error("Not authorized as admin");
+      // Get the user from localStorage (set by AuthContext)
+      const user = JSON.parse(localStorage.getItem('authUser'));
+      if (user && user.is_admin) {
+        localStorage.setItem('adminUser', JSON.stringify(user));
+        navigate('/admindashboard', { replace: true });
+      } else {
+        setError('Not authorized as admin');
       }
-
-      // 3) optional: mark admin flag for your guards that read it
-      localStorage.setItem("adminAuthenticated", "true");
-      localStorage.setItem("adminUser", JSON.stringify(u));
-
-      // 4) redirect — change to "/admin/dashboard" if that’s your route
-      navigate("/admindashboard", { replace: true });
-    } catch (err) {
-      setError(err.message || "Login failed");
-      console.error("Admin login error:", err);
+    } catch (error) {
+      setError(error.message || 'Login failed');
+      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }
@@ -62,7 +63,9 @@ const AdminLogin = () => {
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Admin Sign In
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">Access the admin dashboard</p>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          Access the admin dashboard
+        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -73,7 +76,7 @@ const AdminLogin = () => {
                 {error}
               </div>
             )}
-
+            
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -118,7 +121,7 @@ const AdminLogin = () => {
                 disabled={loading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
               >
-                {loading ? "Signing in..." : "Sign in"}
+                {loading ? 'Signing in...' : 'Sign in'}
               </button>
             </div>
           </form>
